@@ -1,0 +1,221 @@
+diff --git a/frontend/src/App.css b/frontend/src/App.css
+index d3135ac..44208c6 100644
+--- a/frontend/src/App.css
++++ b/frontend/src/App.css
+@@ -489,6 +489,53 @@
+   font-variant-numeric: tabular-nums;
+ }
+ 
++.location-actions {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  flex-wrap: wrap;
++  justify-content: flex-end;
++}
++
++.locate-button {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  padding: 7px 10px;
++  border: 1px solid #cfe0d8;
++  border-radius: 8px;
++  background: #eef6f2;
++  color: #28766c;
++  font-size: 10px;
++  cursor: pointer;
++}
++
++.locate-button:hover:not(:disabled) {
++  background: #e2f0ea;
++}
++
++.locate-button:disabled {
++  opacity: .7;
++  cursor: progress;
++}
++
++.location-status {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  margin: 6px 2px 0;
++  color: #6b7a73;
++  font-size: 9px;
++}
++
++.location-status.is-ok {
++  color: #28766c;
++}
++
++.location-status.is-warn {
++  color: #9a6a2f;
++}
++
+ .map-frame {
+   position: relative;
+   height: 335px;
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 4a7604a..c65e2a0 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -1,9 +1,11 @@
+-import { useCallback, useEffect, useState } from 'react'
++import { useCallback, useEffect, useRef, useState } from 'react'
+ import {
+   Activity,
+   ArrowDownRight,
+   ArrowUpRight,
+   Compass,
++  LoaderCircle,
++  LocateFixed,
+   MapPin,
+   RefreshCw,
+   ShieldCheck,
+@@ -46,16 +48,74 @@ function makeSpatialRequest({ lat, lon }) {
+   }
+ }
+ 
++const GEOLOCATION_OPTIONS = { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 }
++
++const LOCATION_MESSAGES = {
++  locating: 'Finding your device location…',
++  granted: 'Using your device location.',
++  denied: 'Location permission was denied, so the default site is shown. Click the map to choose a site, or allow location access and try again.',
++  unavailable: 'Your device could not determine its position, so the default site is shown.',
++  timeout: 'Finding your location timed out, so the default site is shown.',
++  unsupported: 'This browser does not support device location, so the default site is shown.',
++  insecure: 'Device location only works on https:// or localhost, so the default site is shown.',
++}
++
+ function App() {
+   const [business, setBusiness] = useState(DEFAULT_BUSINESS_INPUTS)
+   const [selectedSite, setSelectedSite] = useState(DEFAULT_SELECTED_SITE)
++  const [locationStatus, setLocationStatus] = useState('idle')
+   const [health, setHealth] = useState('checking')
+   const [result, setResult] = useState(null)
+   const [isLoading, setIsLoading] = useState(false)
+   const [error, setError] = useState('')
++  const hasPickedManually = useRef(false)
+ 
+   const candidates = BENCHMARK_CANDIDATES
+ 
++  const locateDevice = useCallback(({ force = false } = {}) => {
++    if (!window.isSecureContext) {
++      setLocationStatus('insecure')
++      return
++    }
++    if (!('geolocation' in navigator)) {
++      setLocationStatus('unsupported')
++      return
++    }
++
++    setLocationStatus('locating')
++    navigator.geolocation.getCurrentPosition(
++      (position) => {
++        // Never override a site the user already chose by hand while we were waiting,
++        // unless they explicitly pressed "Use my location".
++        if (hasPickedManually.current && !force) {
++          setLocationStatus('idle')
++          return
++        }
++        hasPickedManually.current = false
++        setSelectedSite({ lat: position.coords.latitude, lon: position.coords.longitude })
++        setLocationStatus('granted')
++      },
++      (geoError) => {
++        if (geoError.code === geoError.PERMISSION_DENIED) setLocationStatus('denied')
++        else if (geoError.code === geoError.TIMEOUT) setLocationStatus('timeout')
++        else setLocationStatus('unavailable')
++      },
++      GEOLOCATION_OPTIONS,
++    )
++  }, [])
++
++  // Ask the device for its position once, when the app first opens.
++  useEffect(() => {
++    const timer = window.setTimeout(() => locateDevice(), 0)
++    return () => window.clearTimeout(timer)
++  }, [locateDevice])
++
++  const chooseSite = useCallback((site) => {
++    hasPickedManually.current = true
++    setSelectedSite(site)
++    setLocationStatus('idle')
++  }, [])
++
+   const checkHealth = useCallback(async (signal) => {
+     try {
+       const response = await fetch(HEALTH_URL, { signal })
+@@ -125,7 +185,7 @@ function App() {
+   }
+ 
+   const selectCandidate = (candidate) => {
+-    setSelectedSite({ lat: candidate.lat, lon: candidate.lon })
++    chooseSite({ lat: candidate.lat, lon: candidate.lon })
+   }
+ 
+   return (
+@@ -177,15 +237,29 @@ function App() {
+                   <div className="eyebrow">SITE EXPLORER</div>
+                   <h2>Choose a proposed location</h2>
+                 </div>
+-                <div className="location-chip">
+-                  <MapPin size={15} />
+-                  {selectedSite.lat.toFixed(4)}, {selectedSite.lon.toFixed(4)}
++                <div className="location-actions">
++                  <button
++                    className="locate-button"
++                    type="button"
++                    onClick={() => locateDevice({ force: true })}
++                    disabled={locationStatus === 'locating'}
++                    title="Set the proposed site to this device's current location"
++                  >
++                    {locationStatus === 'locating'
++                      ? <LoaderCircle className="spin" size={14} />
++                      : <LocateFixed size={14} />}
++                    Use my location
++                  </button>
++                  <div className="location-chip">
++                    <MapPin size={15} />
++                    {selectedSite.lat.toFixed(4)}, {selectedSite.lon.toFixed(4)}
++                  </div>
+                 </div>
+               </div>
+               <MapView
+                 candidates={candidates}
+                 selectedSite={selectedSite}
+-                onLocationChange={setSelectedSite}
++                onLocationChange={chooseSite}
+                 onCandidateSelect={selectCandidate}
+               />
+               <div className="map-legend">
+@@ -194,6 +268,14 @@ function App() {
+                 <span><i className="legend-ring" /> 500 m / 1 km radial buffers</span>
+               </div>
+               <p className="map-hint"><Compass size={14} /> Click the map or drag the pin to change the proposed site.</p>
++              {LOCATION_MESSAGES[locationStatus] && (
++                <p
++                  className={`location-status ${locationStatus === 'granted' ? 'is-ok' : locationStatus === 'locating' ? '' : 'is-warn'}`}
++                  role="status"
++                >
++                  <LocateFixed size={14} /> {LOCATION_MESSAGES[locationStatus]}
++                </p>
++              )}
+             </section>
+ 
+             <section className="section-block">
+diff --git a/frontend/src/components/MapView.jsx b/frontend/src/components/MapView.jsx
+index 391ac17..b437766 100644
+--- a/frontend/src/components/MapView.jsx
++++ b/frontend/src/components/MapView.jsx
+@@ -96,7 +96,7 @@ export function MapView({
+         ))}
+       </MapContainer>
+       <span className="map-coordinates">
+-        {selectedSite.lat.toFixed(4)}° N · {selectedSite.lon.toFixed(4)}° E
++        {Math.abs(selectedSite.lat).toFixed(4)}° {selectedSite.lat >= 0 ? 'N' : 'S'} · {Math.abs(selectedSite.lon).toFixed(4)}° {selectedSite.lon >= 0 ? 'E' : 'W'}
+       </span>
+     </div>
+   )

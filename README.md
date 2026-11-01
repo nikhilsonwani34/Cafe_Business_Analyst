@@ -1,5 +1,18 @@
 # Spatial-Financial Startup Feasibility and Location Recommendation System
 
+<!-- readme-sync-bot:toc:start -->
+## Table of Contents
+
+- [Current Verified Status — 15 October 2026](#current-verified-status-15-october-2026)
+- [1. Project Overview](#1-project-overview)
+- [2. System Architecture and Core Engines](#2-system-architecture-and-core-engines)
+- [3. Current Progress and Workspace State](#3-current-progress-and-workspace-state)
+- [4. Planned Directory and File Structure](#4-planned-directory-and-file-structure)
+- [5. Phased Milestone Roadmap](#5-phased-milestone-roadmap)
+- [6. Tech Stack and Architectural Justification](#6-tech-stack-and-architectural-justification)
+- [📋 Recommended Sections Checklist](#-recommended-sections-checklist)
+<!-- readme-sync-bot:toc:end -->
+
 **Decision Support System (DSS) for F&B / Cafés**
 
 ## Current Verified Status — 15 October 2026
@@ -328,3 +341,16 @@ The initial problem is better served by methods whose assumptions can be inspect
 - **TOPSIS** compares candidate locations through visible criteria, normalization, and weights instead of returning an opaque prediction.
 
 This approach does not eliminate uncertainty. It makes the uncertainty, assumptions, and limits easier to explain, test, and revise—and avoids presenting unsupported success probabilities as facts.
+
+<!-- readme-sync-bot:checklist:start -->
+## 📋 Recommended Sections Checklist
+
+_The bot can't write these automatically — they need your judgment, not a diff. This list updates itself as you add them:_
+
+- [ ] License
+- [ ] Author / Contact
+- [ ] Contributing Guidelines
+- [ ] Acknowledgements
+- [ ] Testing
+- [ ] Deployment
+<!-- readme-sync-bot:checklist:end -->
